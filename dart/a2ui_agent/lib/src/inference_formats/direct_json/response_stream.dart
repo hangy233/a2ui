@@ -85,7 +85,10 @@ class DirectJsonResponseStream extends ResponseStream {
   List<ResponsePart> feed(String chunk) {
     if (_closed) throw StateError('The response stream is closed.');
     try {
-      return _feed(chunk);
+      // A chunk may apply messages and then fail, for example in a second
+      // block, before its parts are returned. The transaction undoes them, so
+      // the state holds only what was emitted.
+      return state.transaction(() => _feed(chunk));
     } catch (_) {
       _closed = true;
       rethrow;

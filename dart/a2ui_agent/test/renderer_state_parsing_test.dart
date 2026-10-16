@@ -271,6 +271,38 @@ void main() {
       expect(componentIds(state), {'root'});
     });
 
+    test('a chunk that fails after applying a block leaves the state '
+        'unchanged', () {
+      // A chunk that throws returns no parts, so the state keeps none of it.
+      final state = RendererState([basic]);
+      final DirectJsonResponseStream stream = parser().openStream(state: state);
+      final Map<String, Object?> otherCreate = {
+        'version': 'v0.9',
+        'createSurface': {'surfaceId': 'other', 'catalogId': basic.id},
+      };
+      final Map<String, Object?> invalid = {
+        'version': 'v0.9',
+        'updateComponents': {
+          'surfaceId': 'other',
+          'components': [
+            {'id': 'root', 'component': 'Text'},
+          ],
+        },
+      };
+
+      expect(
+        () => stream.feed(
+          block([
+                create,
+                update([text('root')]),
+              ]) +
+              block([otherCreate, invalid]),
+        ),
+        throwsA(isA<A2uiValidationError>()),
+      );
+      expect(state.surfaceIds, isEmpty);
+    });
+
     test('close flushes text held as a possible tag', () {
       final DirectJsonResponseStream stream = parser().openStream();
 
