@@ -191,7 +191,7 @@ void main() {
     });
 
     test('a block cut off by the end of the response skips the tree '
-        'checks', () {
+        'checks only for the surface it touches', () {
       final open =
           '<a2ui-json>${jsonEncode([
             create,
@@ -199,8 +199,35 @@ void main() {
               column(['a']),
             ]),
           ])}';
+      final otherOpen =
+          '<a2ui-json>${jsonEncode([
+            {
+              'version': 'v0.9',
+              'createSurface': {'surfaceId': 's2', 'catalogId': basic.id},
+            },
+            {
+              'version': 'v0.9',
+              'updateComponents': {
+                'surfaceId': 's2',
+                'components': [
+                  column(['b']),
+                ],
+              },
+            },
+          ])}';
 
       expect(emitted(parser().parseResponse(open)), hasLength(2));
+      expect(
+        () => parser().parseResponse(
+          '${block([
+            create,
+            update([
+              column(['missing']),
+            ]),
+          ])} $otherOpen',
+        ),
+        throwsIntegrity("non-existent component 'missing'"),
+      );
     });
   });
 

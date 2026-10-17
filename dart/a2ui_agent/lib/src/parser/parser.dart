@@ -102,7 +102,7 @@ abstract class Parser {
     List<ResponsePart> parse() {
       final parts = <ResponsePart>[];
       final touched = <String>{};
-      var checkTrees = true;
+      final incomplete = <String>{};
       final List<RawResponsePart> rawParts = wrapped
           ? unwrap(content)
           : [RawA2uiPart(content)];
@@ -112,12 +112,14 @@ abstract class Parser {
             parts.add(part);
           case RawA2uiPart(:final String a2uiRaw, :final bool isFinal):
             final List<AgentToRendererMessage> messages = compile(a2uiRaw);
-            touched.addAll(target().apply(messages));
+            final List<String> blockTouched = target().apply(messages);
+            touched.addAll(blockTouched);
+            if (!isFinal) incomplete.addAll(blockTouched);
             parts.add(A2uiPart(messages));
-            checkTrees = checkTrees && isFinal;
         }
       }
-      if (checkTrees && touched.isNotEmpty) target().checkTopology(touched);
+      final Set<String> complete = touched.difference(incomplete);
+      if (complete.isNotEmpty) target().checkTopology(complete);
       return parts;
     }
 
