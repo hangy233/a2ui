@@ -94,13 +94,17 @@ export class DirectJsonResponseStream implements ResponseStream {
     if (this.closed) {
       throw new Error('The response stream is closed.');
     }
+    // The surfaces of what was emitted before the chunk. A chunk may finish a block, which
+    // clears `touched`, and then fail in a second block; its rollback restores the first
+    // block's earlier messages, which these name.
+    const emittedOn = new Set(this.touched);
     try {
       // A chunk may apply messages and then fail, for example in a second block, before its
       // parts are returned. The transaction undoes them, so the state holds only what was
       // emitted.
       return this.state.transaction(() => this.read(chunk));
     } catch (e) {
-      this.fail();
+      this.fail(emittedOn);
       throw e;
     }
   }
@@ -120,7 +124,7 @@ export class DirectJsonResponseStream implements ResponseStream {
         );
       }
     } catch (e) {
-      this.fail();
+      this.fail(this.touched);
       throw e;
     }
     if (this.held) {
@@ -136,10 +140,12 @@ export class DirectJsonResponseStream implements ResponseStream {
    * The renderer holds the messages already emitted, and so does the state. No message
    * removes a component, so the components they added are marked checked: a later turn is
    * not required to make them reachable.
+   *
+   * @param surfaceIds The surfaces of the messages emitted and left unchecked.
    */
-  private fail(): void {
+  private fail(surfaceIds: Iterable<string>): void {
     this.closed = true;
-    this.state.markChecked(this.touched);
+    this.state.markChecked(surfaceIds);
   }
 
   private read(chunk: string): ResponsePart[] {

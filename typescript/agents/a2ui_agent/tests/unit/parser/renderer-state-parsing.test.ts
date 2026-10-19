@@ -388,6 +388,29 @@ describe('what a failed or cut-off response holds against later turns', () => {
     expect(components(state)['a']).toMatchObject({text: 'Changed'});
   });
 
+  it('does not hold what it emitted when a chunk finishes a block and fails in the next', () => {
+    const parser = new DirectJsonParser([BASIC]);
+    const state = canvas(parser);
+    const stream = parser.openStream({state});
+
+    const parts = stream.feed('<a2ui-json>[' + JSON.stringify(update(text('b'))) + ',');
+    expect(emitted(parts)).toEqual([update(text('b'))]);
+    // The chunk finishes the block, which makes `b` reachable, and then fails in a second
+    // block, so its rollback leaves `b` emitted and unchecked.
+    expect(() =>
+      stream.feed(
+        JSON.stringify(update(column('a', 'b'))) +
+          ']</a2ui-json><a2ui-json>' +
+          JSON.stringify([update({id: 'x', component: 'Unknown'})]) +
+          '</a2ui-json>',
+      ),
+    ).toThrow(A2uiValidationError);
+
+    expect(componentIds(state)).toContain('b');
+    parser.parseResponse(block(CHANGE_A), {state});
+    expect(components(state)['a']).toMatchObject({text: 'Changed'});
+  });
+
   it('keeps only the text in partialResults when the tree check fails', () => {
     const parser = new DirectJsonParser([BASIC]);
     const state = new RendererState([BASIC]);
