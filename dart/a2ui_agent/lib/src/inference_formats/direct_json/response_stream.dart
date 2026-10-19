@@ -33,7 +33,11 @@ part of 'parser.dart';
 /// `conformance/agent/direct_json/response_streaming.yaml`.
 ///
 /// The stream ends when [close] returns or when [feed] or [close] throws:
-/// the response cannot be read further once part of it is rejected.
+/// the response cannot be read further once part of it is rejected. The
+/// messages already emitted stay in [state], since the renderer holds them,
+/// and the components they added are marked checked
+/// ([RendererState.markChecked]), so a later turn on the surface is not
+/// required to make them reachable.
 class DirectJsonResponseStream extends ResponseStream {
   DirectJsonResponseStream._(
     this._parser, {
@@ -84,13 +88,16 @@ class DirectJsonResponseStream extends ResponseStream {
   @override
   List<ResponsePart> feed(String chunk) {
     if (_closed) throw StateError('The response stream is closed.');
+    // The surfaces of the messages already emitted in the open block, which
+    // the state still holds if the chunk fails.
+    final Set<String> emitted = {..._touched};
     try {
       // A chunk may apply messages and then fail, for example in a second
       // block, before its parts are returned. The transaction undoes them, so
       // the state holds only what was emitted.
       return state.transaction(() => _feed(chunk));
     } catch (_) {
-      _closed = true;
+      _fail(emitted);
       rethrow;
     }
   }
@@ -100,21 +107,37 @@ class DirectJsonResponseStream extends ResponseStream {
     if (_closed) return [];
     _closed = true;
     final parts = <ResponsePart>[];
-    if (!_wrapped) {
-      _finishBlock(parts, _block);
-      return parts;
-    }
-    if (_inBlock) {
-      throw A2uiParseError(
-        'The response ended inside an $openTagText block, before its '
-        '$closeTagText tag.',
-      );
+    try {
+      if (!_wrapped) {
+        _finishBlock(parts, _block);
+        return parts;
+      }
+      if (_inBlock) {
+        throw A2uiParseError(
+          'The response ended inside an $openTagText block, before its '
+          '$closeTagText tag.',
+        );
+      }
+    } catch (_) {
+      _fail(_touched);
+      rethrow;
     }
     if (_held.isNotEmpty) {
       _emitText(parts, _held);
       _held = '';
     }
     return parts;
+  }
+
+  /// Ends the stream after a failure, keeping what it emitted.
+  ///
+  /// The renderer holds the messages already emitted, which touched
+  /// [surfaceIds], and so does the state. No message removes a component, so
+  /// the components they added are marked checked: a later turn is not
+  /// required to make them reachable.
+  void _fail(Iterable<String> surfaceIds) {
+    _closed = true;
+    state.markChecked(surfaceIds);
   }
 
   List<ResponsePart> _feed(String chunk) {

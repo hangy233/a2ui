@@ -98,6 +98,10 @@ void main() {
     ),
   );
 
+  final Map<String, Object?> changeA = update([
+    {'id': 'a', 'component': 'Text', 'text': 'Changed'},
+  ]);
+
   group('parseResponse', () {
     test('a chat turn shows new UI', () {
       // Without a state, an update to a surface the turn never created is
@@ -228,6 +232,24 @@ void main() {
         ),
         throwsIntegrity("non-existent component 'missing'"),
       );
+    });
+
+    test('a truncated block does not hold its components against later '
+        'turns', () {
+      // Direct JSON compiles a cut-off block that holds whole JSON, as
+      // Express compiles one as far as it goes.
+      final RendererState state = canvas();
+
+      parser().parseResponse(
+        '<a2ui-json>${jsonEncode([
+          update([text('orphan')]),
+        ])}',
+        state: state,
+      );
+
+      expect(componentIds(state), contains('orphan'));
+      parser().parseResponse(block([changeA]), state: state);
+      expect(components(state)['a'], containsPair('text', 'Changed'));
     });
   });
 
@@ -532,6 +554,55 @@ void main() {
         () => stream.feed('${body.substring(body.length - 2)}</a2ui-json>'),
         throwsA(isA<A2uiValidationError>()),
       );
+    });
+
+    test(
+      'a failed stream does not hold what it emitted against later turns',
+      () {
+        final RendererState state = canvas();
+        final DirectJsonResponseStream stream = parser().openStream(
+          state: state,
+        );
+
+        final List<ResponsePart> parts = stream.feed(
+          '<a2ui-json>[${jsonEncode(update([text('orphan')]))}',
+        );
+        expect(emitted(parts), isNotEmpty);
+        expect(
+          () => stream.feed(']</a2ui-json>'),
+          throwsIntegrity("'orphan' is not reachable"),
+        );
+
+        // The renderer holds the orphan, and no message can remove it.
+        expect(componentIds(state), contains('orphan'));
+        parser().parseResponse(block([changeA]), state: state);
+        expect(components(state)['a'], containsPair('text', 'Changed'));
+      },
+    );
+
+    test('a stream cut off inside a block does not hold what it emitted', () {
+      final RendererState state = canvas();
+      final DirectJsonResponseStream stream = parser().openStream(state: state);
+
+      expect(
+        emitted(
+          stream.feed('<a2ui-json>[${jsonEncode(update([text('orphan')]))},'),
+        ),
+        isNotEmpty,
+      );
+      expect(
+        stream.close,
+        throwsA(
+          isA<A2uiParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('ended inside'),
+          ),
+        ),
+      );
+
+      parser().parseResponse(block([changeA]), state: state);
+      expect(components(state)['a'], containsPair('text', 'Changed'));
     });
   });
 

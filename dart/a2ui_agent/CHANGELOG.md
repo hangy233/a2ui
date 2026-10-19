@@ -17,6 +17,12 @@
     the last check is reachable from the root. A component that an update
     detached, by rewriting its parent's children, is accepted, since the
     protocol has no message that removes one component.
+  - `markChecked` stops holding the components each surface changed against
+    later `checkTopology` calls. A stream that fails after emitting messages,
+    and a block cut off at the end of a response, mark their surfaces
+    checked: the renderer holds those components and no message removes one,
+    so later turns aren't required to make them reachable. Dangling
+    references and a missing root are still reported.
   - `dispose` releases the surfaces the state holds.
 - Add `validatePayload`, which checks one payload with no record of earlier
   ones, such as the argument of a tool call. It runs on a short-lived
@@ -31,9 +37,9 @@
   turn. The response is applied to the state all or nothing, and the trees of
   every surface it touches, including surfaces it only updates, are checked
   once every block is applied, unless a block is cut off by the end of the
-  response. Express output is checked the same way, which rejects inline
-  child ids that collide with assigned variables and check lists on
-  components that declare none.
+  response; the components of a cut-off block are marked checked. Express
+  output is checked the same way, which rejects inline child ids that collide
+  with assigned variables and check lists on components that declare none.
 - Breaking: a parser holds no state, so one parser reads every response of a
   request. `Parser.parseChunk` is removed: open a stream for each response
   with `parser.openStream(wrapped: ...)`, call `feed(chunk)` for each chunk,
@@ -55,7 +61,8 @@
     `A2uiParseError` if a block is still open, and checks the tree of an
     unwrapped stream.
   - A stream that throws has ended: `feed` then throws `StateError`, and
-    `close` returns nothing.
+    `close` returns nothing. The messages it emitted stay in its state, and
+    their components are marked checked.
 - Breaking: `Parser.compile` only translates a block into messages. It
   reports what the notation gets wrong, but `DirectJsonParser.compile` no
   longer checks components, function calls, themes or catalog ids against the

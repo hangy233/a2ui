@@ -86,6 +86,12 @@ abstract class Parser {
   /// against a new, empty one holding [catalogs], so an update to a surface
   /// the response does not create is rejected.
   ///
+  /// A block cut off at the end of the response, which formats other than
+  /// direct JSON compile as far as it goes, is applied too, but the trees of
+  /// the surfaces it touches are not checked, and the components it added
+  /// are marked checked ([RendererState.markChecked]), so a later turn is not
+  /// required to make them reachable.
+  ///
   /// When [wrapped] is false, [content] is a single payload without sentinel
   /// tags.
   ///
@@ -120,6 +126,13 @@ abstract class Parser {
       }
       final Set<String> complete = touched.difference(incomplete);
       if (complete.isNotEmpty) target().checkTopology(complete);
+      // A truncated block's messages are kept, as the renderer the caller
+      // sends them to will hold them, but its trees are not checked: a
+      // cut-off block is missing what it would have added. Its components are
+      // marked checked, so a later turn is not required to make them
+      // reachable; its dangling references and a missing root are still
+      // reported when a later turn checks the surface.
+      if (incomplete.isNotEmpty) target().markChecked(incomplete);
       return parts;
     }
 
