@@ -45,7 +45,7 @@ for (const part of processor.parseResponse(llmResponse)) {
 }
 ```
 
-`parseResponse` throws an `A2uiError` when a block cannot be read or a renderer would reject a message. The error's `partialResults` holds the parts read before it.
+`parseResponse` throws an `A2uiError` when a block cannot be read or a renderer would reject a message. The error's `partialResults` holds the parts before the failing block, or only the text when the tree check across every block fails. None of them is applied to the state.
 
 ## Chat and canvas
 

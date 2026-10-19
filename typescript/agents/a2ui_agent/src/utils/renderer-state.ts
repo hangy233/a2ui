@@ -225,10 +225,24 @@ export class RendererState {
         );
       }
     }
-    for (const surfaceId of ids) {
-      // An assumed surface was not checked, so what changed on it stays recorded for the
-      // check after it is created.
-      if (!this.assumed.has(surfaceId) && this.changed.get(surfaceId)?.size) {
+    // An assumed surface was not checked, so what changed on it stays recorded for the check
+    // after it is created.
+    this.markChecked(ids.filter(s => !this.assumed.has(s)));
+  }
+
+  /**
+   * Stops holding the components each surface changed against later checks.
+   *
+   * `checkTopology` calls this for the surfaces it checks. A caller calls it for the surfaces
+   * of messages the renderer received that failed a check, such as a stream that failed after
+   * it emitted them: no message removes a component, so a component the renderer already
+   * holds can't be made reachable later, and the later turns are not held to it. Dangling
+   * references and a missing root are still reported, since `checkTopology` checks those on
+   * the whole surface.
+   */
+  markChecked(surfaceIds: Iterable<string>): void {
+    for (const surfaceId of new Set(surfaceIds)) {
+      if (this.changed.get(surfaceId)?.size) {
         this.save(surfaceId);
         this.changed.delete(surfaceId);
       }

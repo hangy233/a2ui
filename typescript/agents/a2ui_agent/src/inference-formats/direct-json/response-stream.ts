@@ -57,7 +57,10 @@ export interface DirectJsonStreamSource {
  * and every surface they touched is checked in full.
  *
  * The stream ends when `close` returns or when `feed` or `close` throws: the response cannot
- * be read further once part of it is rejected.
+ * be read further once part of it is rejected. The messages already emitted stay in the
+ * state, since the renderer holds them, and the components they added are marked checked
+ * (`RendererState.markChecked`), so a later turn on the surface is not required to make them
+ * reachable.
  */
 export class DirectJsonResponseStream implements ResponseStream {
   private readonly v10: boolean;
@@ -97,7 +100,7 @@ export class DirectJsonResponseStream implements ResponseStream {
       // emitted.
       return this.state.transaction(() => this.read(chunk));
     } catch (e) {
-      this.closed = true;
+      this.fail();
       throw e;
     }
   }
@@ -106,20 +109,37 @@ export class DirectJsonResponseStream implements ResponseStream {
     if (this.closed) return [];
     this.closed = true;
     const parts: ResponsePart[] = [];
-    if (!this.wrapped) {
-      this.finishBlock(parts, this.block);
-      return parts;
-    }
-    if (this.inBlock) {
-      throw new ParseError(
-        `The response ended inside an ${OPEN_TAG} block, before its ${CLOSE_TAG} tag.`,
-      );
+    try {
+      if (!this.wrapped) {
+        this.finishBlock(parts, this.block);
+        return parts;
+      }
+      if (this.inBlock) {
+        throw new ParseError(
+          `The response ended inside an ${OPEN_TAG} block, before its ${CLOSE_TAG} tag.`,
+        );
+      }
+    } catch (e) {
+      this.fail();
+      throw e;
     }
     if (this.held) {
       this.emitText(parts, this.held);
       this.held = '';
     }
     return parts;
+  }
+
+  /**
+   * Ends the stream after a failure, keeping what it emitted.
+   *
+   * The renderer holds the messages already emitted, and so does the state. No message
+   * removes a component, so the components they added are marked checked: a later turn is
+   * not required to make them reachable.
+   */
+  private fail(): void {
+    this.closed = true;
+    this.state.markChecked(this.touched);
   }
 
   private read(chunk: string): ResponsePart[] {

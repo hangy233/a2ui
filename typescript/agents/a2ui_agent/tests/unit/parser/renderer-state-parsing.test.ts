@@ -350,6 +350,78 @@ describe('ResponseStream', () => {
   });
 });
 
+/** A canvas state holding surface `s` with `root -> a`. */
+function canvas(parser: DirectJsonParser): RendererState {
+  const state = new RendererState([BASIC]);
+  parser.parseResponse(block(CREATE, update(column('a'), text('a'))), {state});
+  return state;
+}
+
+const CHANGE_A = update({id: 'a', component: 'Text', text: 'Changed'});
+
+describe('what a failed or cut-off response holds against later turns', () => {
+  it('does not hold what a failed stream emitted against later turns', () => {
+    const parser = new DirectJsonParser([BASIC]);
+    const state = canvas(parser);
+    const stream = parser.openStream({state});
+
+    const parts = stream.feed('<a2ui-json>[' + JSON.stringify(update(text('orphan'))));
+    expect(emitted(parts)).not.toEqual([]);
+    expect(() => stream.feed(']</a2ui-json>')).toThrow(/'orphan' is not reachable/);
+
+    // The renderer holds the orphan, and no message can remove it.
+    expect(componentIds(state)).toContain('orphan');
+    parser.parseResponse(block(CHANGE_A), {state});
+    expect(components(state)['a']).toMatchObject({text: 'Changed'});
+  });
+
+  it('does not hold what a stream cut off inside a block emitted', () => {
+    const parser = new DirectJsonParser([BASIC]);
+    const state = canvas(parser);
+    const stream = parser.openStream({state});
+
+    const parts = stream.feed('<a2ui-json>[' + JSON.stringify(update(text('orphan'))) + ',');
+    expect(emitted(parts)).not.toEqual([]);
+    expect(() => stream.close()).toThrow(/ended inside/);
+
+    parser.parseResponse(block(CHANGE_A), {state});
+    expect(components(state)['a']).toMatchObject({text: 'Changed'});
+  });
+
+  it('keeps only the text in partialResults when the tree check fails', () => {
+    const parser = new DirectJsonParser([BASIC]);
+    const state = new RendererState([BASIC]);
+
+    const error = caught(() =>
+      parser.parseResponse('Here.\n' + block(CREATE, update(column('missing'))), {state}),
+    );
+
+    expect(error).toBeInstanceOf(A2uiIntegrityError);
+    expect(String(error)).toMatch(/Dangling reference/);
+    const partial = (error as {partialResults: ResponsePart[]}).partialResults;
+    expect(partial.every(part => part.type === 'text')).toBe(true);
+    expect(textOf(partial)).toBe('Here.');
+    expect(state.getSurface('s')).toBeUndefined();
+  });
+
+  it("does not hold a truncated block's components against later turns", () => {
+    /** Compiles a cut-off block as far as it goes, as Express does. */
+    class TruncationTolerantParser extends DirectJsonParser {
+      override compile(formatContent: string): ReturnType<DirectJsonParser['compile']> {
+        return super.compile(formatContent);
+      }
+    }
+    const parser = new TruncationTolerantParser([BASIC]);
+    const state = canvas(parser);
+
+    parser.parseResponse('<a2ui-json>' + JSON.stringify([update(text('orphan'))]), {state});
+
+    expect(componentIds(state)).toContain('orphan');
+    parser.parseResponse(block(CHANGE_A), {state});
+    expect(components(state)['a']).toMatchObject({text: 'Changed'});
+  });
+});
+
 describe('A2uiRequestProcessor with a renderer state', () => {
   it('parses canvas turns against the state it is given', () => {
     const processor = new A2uiRequestProcessor([BASIC]);

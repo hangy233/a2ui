@@ -299,4 +299,23 @@ describe('RendererState', () => {
 
     expect(state.getSurface('s')?.dataModel.get('/')).toEqual({name: 'Ada'});
   });
+
+  it('stops holding changed components against checks once marked checked', () => {
+    const state = canvas();
+    state.apply(update(text('orphan')));
+
+    state.markChecked(['s']);
+
+    expect(() => state.checkTopology(['s'])).not.toThrow();
+  });
+
+  it('still reports a dangling reference after a surface is marked checked', () => {
+    const state = canvas();
+    state.apply(update(column(['a', 'missing'])));
+
+    state.markChecked(['s']);
+
+    expect(() => state.checkTopology(['s'])).toThrow(A2uiIntegrityError);
+    expect(() => state.checkTopology(['s'])).toThrow(/Dangling reference/);
+  });
 });
