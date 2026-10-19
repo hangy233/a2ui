@@ -61,7 +61,8 @@ class A2uiRequestProcessor {
   ///
   /// [state] is the renderer state a canvas agent keeps for the
   /// conversation, which [parseResponse] and [openStream] use when a call
-  /// passes none.
+  /// passes none. A processor bound to a state serves only that
+  /// conversation.
   ///
   /// Throws the [A2uiValidationError] a renderer would report for the first
   /// message it rejects, such as one for a component the catalogs do not
@@ -151,19 +152,30 @@ class A2uiRequestProcessor {
     return state;
   }
 
+  /// Whether the processor can check responses against [state].
+  ///
+  /// A state is accepted when it holds [activeCatalogs], in the same order,
+  /// since the order decides which catalog a surface resolves to. A state
+  /// made with [createState] is always accepted. An agent that keeps a state
+  /// per conversation calls this to tell whether the state still fits the
+  /// request's catalogs, and makes a new one with [createState] when it
+  /// doesn't.
+  bool acceptsState(RendererState state) =>
+      _catalogKeys(state.catalogs).join('\n') ==
+      _catalogKeys(activeCatalogs).join('\n');
+
   void _checkState(RendererState? state) {
-    if (state == null) return;
-    List<String> describe(List<CatalogApi> catalogs) => [
-      for (final CatalogApi catalog in catalogs)
-        '${catalog.id} (${catalog.protocolVersion?.jsonValue})',
-    ];
-    final List<String> held = describe(state.catalogs);
-    final List<String> active = describe(activeCatalogs);
-    if (held.join('\n') != active.join('\n')) {
-      throw A2uiCatalogError(
-        'The renderer state holds catalogs $held, but the processor\'s '
-        'active catalogs are $active.',
-      );
-    }
+    if (state == null || acceptsState(state)) return;
+    throw A2uiCatalogError(
+      'The renderer state holds catalogs ${_catalogKeys(state.catalogs)}, '
+      'but the processor\'s active catalogs are '
+      '${_catalogKeys(activeCatalogs)}.',
+    );
   }
 }
+
+/// The id and protocol version of each of [catalogs], in order.
+List<String> _catalogKeys(List<CatalogApi> catalogs) => [
+  for (final CatalogApi catalog in catalogs)
+    '${catalog.id} (${catalog.protocolVersion?.jsonValue})',
+];

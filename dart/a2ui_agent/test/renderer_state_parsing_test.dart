@@ -678,6 +678,21 @@ void main() {
       );
     });
 
+    test('accepts a state that holds the active catalogs in order', () {
+      final Catalog other = Catalog.fromJson({
+        'catalogId': 'other',
+        'protocolVersion': '0.9',
+        'components': <String, Object?>{},
+      });
+      final processor = A2uiRequestProcessor(activeCatalogs: [basic, other]);
+
+      expect(processor.acceptsState(processor.createState()), isTrue);
+      expect(processor.acceptsState(RendererState([basic, other])), isTrue);
+      // The order decides which catalog a surface resolves to.
+      expect(processor.acceptsState(RendererState([other, basic])), isFalse);
+      expect(processor.acceptsState(RendererState([basic])), isFalse);
+    });
+
     test('uses a bound state when a call passes none', () {
       final state = RendererState([basic]);
       final processor = A2uiRequestProcessor(
@@ -719,6 +734,29 @@ void main() {
       expect(
         generator.createProcessor(capabilities, state: state).state,
         same(state),
+      );
+    });
+
+    test('A2uiGenerator rejects a state for other catalogs', () {
+      final generator = A2uiGenerator(catalogs: [CatalogConfig(basic)]);
+      final capabilities = A2uiRendererCapabilities.forCatalogIds([basic.id]);
+      final other = RendererState([
+        Catalog.fromJson({
+          'catalogId': 'other',
+          'protocolVersion': '0.9',
+          'components': <String, Object?>{},
+        }),
+      ]);
+
+      expect(
+        () => generator.createProcessor(capabilities, state: other),
+        throwsA(
+          isA<A2uiCatalogError>().having(
+            (e) => e.message,
+            'message',
+            contains('active catalogs'),
+          ),
+        ),
       );
     });
   });

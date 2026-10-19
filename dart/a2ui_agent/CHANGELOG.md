@@ -74,6 +74,9 @@
   constructor parameter or `A2uiGenerator.createProcessor(..., state: ...)`,
   so that `parseResponse` and `openStream` use it when a call passes none.
   A state for other catalogs throws `A2uiCatalogError`.
+  `A2uiRequestProcessor.acceptsState` tells whether a state holds the
+  processor's catalogs, so an agent that keeps a state per conversation can
+  tell when to make a new one.
   `A2uiRequestProcessor.parseResponse` also takes `wrapped`.
 - Support cross-catalog `$ref` references across peer catalogs in
   `resolveCatalogs`, payload checks, `DirectJsonPromptGenerator` (preserving
