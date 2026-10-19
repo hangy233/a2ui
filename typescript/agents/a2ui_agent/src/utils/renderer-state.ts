@@ -137,7 +137,7 @@ export class RendererState {
     return [...this._catalogs];
   }
 
-  /** The ids of the surfaces the renderer holds. */
+  /** The ids of the surfaces the renderer holds, in no particular order. */
   get surfaceIds(): string[] {
     return [...this.processor.model.surfacesMap.keys()];
   }
@@ -226,7 +226,9 @@ export class RendererState {
       }
     }
     for (const surfaceId of ids) {
-      if (this.changed.get(surfaceId)?.size) {
+      // An assumed surface was not checked, so what changed on it stays recorded for the
+      // check after it is created.
+      if (!this.assumed.has(surfaceId) && this.changed.get(surfaceId)?.size) {
         this.save(surfaceId);
         this.changed.delete(surfaceId);
       }
@@ -351,13 +353,22 @@ export class RendererState {
    * Whether an update to a surface the state lacks assumes the surface.
    *
    * A payload state assumes a surface the payload never named before, but not one that an
-   * earlier message of the payload deleted: a renderer rejects updates to it.
+   * earlier message of the payload deleted, nor one that a later message creates before any
+   * message deletes it: a renderer rejects updates to either, since the surface does not
+   * exist yet when they arrive.
    */
   private assumes(surfaceId: string, payload: Message[], index: number): boolean {
-    return (
-      this.assumesUnknownSurfaces &&
-      payload.slice(0, index).every(message => target(message)[0] !== surfaceId)
-    );
+    if (!this.assumesUnknownSurfaces) return false;
+    if (payload.slice(0, index).some(message => target(message)[0] === surfaceId)) {
+      return false;
+    }
+    for (const later of payload.slice(index + 1)) {
+      const [targetId, creates] = target(later);
+      if (targetId !== surfaceId) continue;
+      if (creates) return false;
+      if ('deleteSurface' in later) break;
+    }
+    return true;
   }
 
   /**

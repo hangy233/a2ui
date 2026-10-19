@@ -207,6 +207,13 @@ describe('validatePayload', () => {
     ).toThrow(A2uiValidationError);
   });
 
+  it('does not assume a surface that a later message creates', () => {
+    const check = () => validatePayload([BASIC], [update(COLUMN, TEXT), create(basicId)]);
+
+    expect(check).toThrow(A2uiValidationError);
+    expect(check).toThrow(/Surface not found/);
+  });
+
   it('accepts a surface recreated after a delete', () => {
     validatePayload(
       [BASIC],
