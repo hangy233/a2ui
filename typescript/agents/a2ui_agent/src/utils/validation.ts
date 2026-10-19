@@ -49,7 +49,8 @@ class PayloadState extends RendererState {
  * surface passes if one such catalog accepts it.
  *
  * To check a payload against what earlier payloads sent, keep a `RendererState` and call
- * its `apply` and `checkTopology` instead.
+ * its `apply` and `checkTopology` inside `state.transaction(...)`, so that a rejected
+ * response is rolled back whole.
  *
  * Each message must match the protocol's message schema and state a `version` that the
  * catalogs' protocol version accepts, spelled as the specification spells it: `v0.9` or
