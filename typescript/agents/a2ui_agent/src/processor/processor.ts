@@ -28,7 +28,8 @@ export interface A2uiRequestProcessorOptions {
   /**
    * The renderer state a canvas agent keeps for the conversation. `parseResponse` and
    * `openStream` use it when a call passes none. Without one, each call checks the response
-   * against a new state, as a chat agent wants.
+   * against a new state, as a chat agent wants. A processor bound to a state serves only that
+   * conversation.
    */
   state?: RendererState;
 }
@@ -134,16 +135,28 @@ export class A2uiRequestProcessor {
     return options.state;
   }
 
-  private checkState(state: RendererState | undefined): void {
-    if (state === undefined) return;
-    const describe = (catalogs: CatalogApi[]) =>
-      catalogs.map(c => `${c.id} (${toWireProtocolVersion(c.protocolVersion)})`).join(', ');
-    const held = describe(state.catalogs);
-    const active = describe(this.catalogs);
-    if (held !== active) {
-      throw new A2uiCatalogError(
-        `The renderer state holds catalogs [${held}], but the processor's active catalogs are [${active}].`,
-      );
-    }
+  /**
+   * Whether the processor can check responses against a renderer state.
+   *
+   * A state is accepted when it holds the processor's active catalogs, in the same order, since
+   * the order decides which catalog a surface resolves to. A state made with `createState` is
+   * always accepted. An agent that keeps a state per conversation calls this to tell whether the
+   * state still fits the request's catalogs, and makes a new one with `createState` when it
+   * doesn't.
+   */
+  acceptsState(state: RendererState): boolean {
+    return describeCatalogs(state.catalogs) === describeCatalogs(this.catalogs);
   }
+
+  private checkState(state: RendererState | undefined): void {
+    if (state === undefined || this.acceptsState(state)) return;
+    throw new A2uiCatalogError(
+      `The renderer state holds catalogs [${describeCatalogs(state.catalogs)}], but the processor's active catalogs are [${describeCatalogs(this.catalogs)}].`,
+    );
+  }
+}
+
+/** The id and normalized protocol version of each catalog, in order. */
+function describeCatalogs(catalogs: CatalogApi[]): string {
+  return catalogs.map(c => `${c.id} (${toWireProtocolVersion(c.protocolVersion)})`).join(', ');
 }

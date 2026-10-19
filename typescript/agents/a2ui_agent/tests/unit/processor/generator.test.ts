@@ -20,6 +20,8 @@ import {CatalogConfig} from '../../../src/processor/catalog-config.js';
 import {loadBasicCatalog} from '../../helpers/basic-catalogs.js';
 import {A2uiCatalogError, A2uiValidationError} from '../../../src/errors.js';
 import {V10RendererCapabilities} from '../../../src/internal/web-core.js';
+import {InMemoryCatalogProvider} from '../../../src/processor/catalog-providers.js';
+import {RendererState} from '../../../src/utils/renderer-state.js';
 
 const basicCatalogV10 = loadBasicCatalog('v1.0');
 
@@ -125,5 +127,28 @@ describe('A2uiGenerator', () => {
 
     expect(() => generator.createProcessor(mockCapabilities)).toThrow(A2uiValidationError);
     expect(() => generator.createProcessor(mockCapabilities)).toThrow(/broken_turn/);
+  });
+
+  test('binds the state to the processor', () => {
+    const generator = new A2uiGenerator([new CatalogConfig(basicCatalogV10)]);
+    const state = generator.createProcessor(mockCapabilities).createState();
+
+    const processor = generator.createProcessor(mockCapabilities, undefined, {state});
+
+    expect(processor.state).toBe(state);
+  });
+
+  test('rejects a state for other catalogs', () => {
+    const generator = new A2uiGenerator([new CatalogConfig(basicCatalogV10)]);
+    const other = new RendererState([
+      new InMemoryCatalogProvider({catalogId: 'other', components: {}}, 'v1.0').load(),
+    ]);
+
+    expect(() => generator.createProcessor(mockCapabilities, undefined, {state: other})).toThrow(
+      A2uiCatalogError,
+    );
+    expect(() => generator.createProcessor(mockCapabilities, undefined, {state: other})).toThrow(
+      /active catalogs/,
+    );
   });
 });

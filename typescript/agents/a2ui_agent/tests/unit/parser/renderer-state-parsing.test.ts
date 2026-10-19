@@ -512,6 +512,17 @@ describe('A2uiRequestProcessor with a renderer state', () => {
     expect(processor.state).toBe(state);
   });
 
+  it('accepts a state that holds the active catalogs in order', () => {
+    const other = otherCatalog();
+    const processor = new A2uiRequestProcessor([BASIC, other]);
+
+    expect(processor.acceptsState(processor.createState())).toBe(true);
+    expect(processor.acceptsState(new RendererState([BASIC, other]))).toBe(true);
+    // The order decides which catalog a surface resolves to.
+    expect(processor.acceptsState(new RendererState([other, BASIC]))).toBe(false);
+    expect(processor.acceptsState(new RendererState([BASIC]))).toBe(false);
+  });
+
   it('reuses one parser', () => {
     const processor = new A2uiRequestProcessor([BASIC]);
 
