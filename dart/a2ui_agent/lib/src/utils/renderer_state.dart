@@ -80,9 +80,6 @@ class _Frame {
 /// The state is authoritative for surfaces and their components. The data
 /// model values it holds can drift from the renderer's, since the user edits
 /// bound inputs there, but no check depends on them.
-///
-/// Checking messages for v1.0 catalogs is not implemented yet: [apply]
-/// throws [UnimplementedError] for them.
 class RendererState {
   /// Creates the empty state of a renderer that holds [catalogs].
   ///
@@ -141,11 +138,12 @@ class RendererState {
   /// Checks [messages] against the state and applies them.
   ///
   /// Each message must state a `version` that the catalogs' protocol version
-  /// accepts: `v0.9` or `v0.9.1` for v0.9 and v0.9.1 catalogs. Each component
-  /// and function call is checked against the catalog it resolves to, and
-  /// component ids and cycles against the surface's components. References,
-  /// the root and reachability are left to [checkTopology], since a
-  /// component may name a child that a later message adds.
+  /// accepts: `v0.9` or `v0.9.1` for v0.9 and v0.9.1 catalogs, and `v1.0` for
+  /// v1.0 catalogs. Each component and function call is checked against the
+  /// catalog it resolves to, and component ids and cycles against the
+  /// surface's components. References, the root and reachability are left to
+  /// [checkTopology], since a component may name a child that a later message
+  /// adds.
   ///
   /// The call is atomic: if a message is rejected, none of them is applied.
   ///
@@ -154,14 +152,10 @@ class RendererState {
   ///
   /// Throws [A2uiValidationError], or a subclass such as
   /// [A2uiIntegrityError], describing the first problem found if a renderer
-  /// in this state would reject a message. Throws [UnimplementedError] for
-  /// messages of v1.0 catalogs.
+  /// in this state would reject a message.
   List<String> apply(Iterable<AgentToRendererMessage> messages) {
     final List<AgentToRendererMessage> payload = messages.toList();
     if (payload.isEmpty) return [];
-    if (_protocolVersion.isAtLeast(A2uiProtocolVersion.v1_0)) {
-      throw UnimplementedError('Checking payloads of protocol v1.0');
-    }
     for (final (int index, AgentToRendererMessage message) in payload.indexed) {
       _checkMessage(message, index);
     }
@@ -421,6 +415,13 @@ class RendererState {
         "${accepted.map((v) => "'$v'").join(' or ')}.",
       );
     }
+    if (message is CreateSurfaceMessage &&
+        message.components != null &&
+        message.components!.isEmpty) {
+      throw A2uiValidationError(
+        "Message $index (createSurface) has an empty 'components' list.",
+      );
+    }
     if (message is UpdateComponentsMessage && message.components.isEmpty) {
       throw A2uiValidationError(
         "Message $index (updateComponents) has an empty 'components' list.",
@@ -531,8 +532,6 @@ SurfaceModel<ComponentApi> _cloneSurface(SurfaceModel<ComponentApi> surface) {
     callAgentFunction: surface.callAgentFunction,
   );
   clone.dataModel.set('/', _deepCopy(surface.dataModel.get('/')));
-  // A v0.9 surface draws on its default catalog alone, so the clone finds
-  // child references through that catalog, as the surface did.
   for (final ComponentModel component in surface.componentsModel.values) {
     clone.componentsModel.addComponent(
       ComponentModel(

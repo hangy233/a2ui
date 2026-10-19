@@ -498,19 +498,18 @@ void main() {
       );
     });
 
-    test('checking v1.0 messages is not implemented yet', () {
+    test('checks v1.0 messages', () {
       final state = RendererState([BasicCatalog.v1_0()]);
 
-      expect(
-        () => state.apply([
-          CreateSurfaceMessage(
-            version: 'v1.0',
-            surfaceId: 's',
-            catalogId: BasicCatalog.v1_0Id,
-          ),
-        ]),
-        throwsUnimplementedError,
-      );
+      _turn(state, [
+        CreateSurfaceMessage(
+          version: 'v1.0',
+          surfaceId: 's',
+          catalogId: BasicCatalog.v1_0Id,
+          components: [_text('root')],
+        ),
+      ]);
+      expect(_componentIds(state), {'root'});
       expect(state.apply([]), isEmpty);
     });
   });
