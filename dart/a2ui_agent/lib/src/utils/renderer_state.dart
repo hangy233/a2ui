@@ -127,7 +127,7 @@ class RendererState {
 
   final List<_Frame> _frames = [];
 
-  /// The ids of the surfaces the renderer holds.
+  /// The ids of the surfaces the renderer holds, in no particular order.
   List<String> get surfaceIds => [
     for (final SurfaceModel<ComponentApi> surface
         in _processor.model.allSurfaces)
@@ -215,7 +215,10 @@ class RendererState {
       }
     }
     for (final surfaceId in ids) {
-      if (_changed[surfaceId]?.isNotEmpty ?? false) {
+      // An assumed surface was not checked, so what changed on it stays
+      // recorded for the check after it is created.
+      if (!_assumed.contains(surfaceId) &&
+          (_changed[surfaceId]?.isNotEmpty ?? false)) {
         _save(surfaceId);
         _changed.remove(surfaceId);
       }
@@ -340,15 +343,24 @@ class RendererState {
   /// Whether an update to a surface the state lacks assumes the surface.
   ///
   /// A payload state assumes a surface the payload never named before, but
-  /// not one that an earlier message of the payload deleted: a renderer
-  /// rejects updates to it.
+  /// not one that an earlier message of the payload deleted, nor one that a
+  /// later message creates before any message deletes it: a renderer rejects
+  /// updates to either, since the surface does not exist yet when they
+  /// arrive.
   bool _assumes(
     String surfaceId,
     List<AgentToRendererMessage> payload,
     int index,
-  ) =>
-      _assumesUnknownSurfaces &&
-      payload.take(index).every((m) => _target(m) != surfaceId);
+  ) {
+    if (!_assumesUnknownSurfaces) return false;
+    if (payload.take(index).any((m) => _target(m) == surfaceId)) return false;
+    for (final AgentToRendererMessage later in payload.skip(index + 1)) {
+      if (_target(later) != surfaceId) continue;
+      if (later is CreateSurfaceMessage) return false;
+      if (later is DeleteSurfaceMessage) break;
+    }
+    return true;
+  }
 
   /// Creates a placeholder for an unknown surface and applies the update.
   ///
@@ -421,7 +433,8 @@ class RendererState {
 /// ones: an update to a surface it never saw created makes an empty
 /// placeholder for it, on the first catalog that defines the components of
 /// the payload's updates to it and accepts all of them. A surface that an
-/// earlier message of the payload deleted is not assumed again.
+/// earlier message of the payload deleted is not assumed again, nor is one
+/// that a later message creates before any message deletes it.
 ///
 /// For `validatePayload`; not exported.
 RendererState createPayloadState(List<CatalogApi> catalogs) =>

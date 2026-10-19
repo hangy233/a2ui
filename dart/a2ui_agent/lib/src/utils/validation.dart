@@ -31,7 +31,8 @@ import 'renderer_state.dart';
 ///
 /// To check a payload against what earlier payloads sent, keep a
 /// [RendererState] and call its [RendererState.apply] and
-/// [RendererState.checkTopology] instead.
+/// [RendererState.checkTopology] inside [RendererState.transaction], so a
+/// rejected response is rolled back whole.
 ///
 /// Each message must state a `version` that the catalogs' protocol version
 /// accepts, such as `v0.9` or `v0.9.1` for v0.9 catalogs.

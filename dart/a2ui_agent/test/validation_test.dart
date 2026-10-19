@@ -316,6 +316,25 @@ void main() {
       );
     });
 
+    test('does not assume a surface that a later message creates', () {
+      expect(
+        () => validatePayload(
+          [basic],
+          [
+            update([text('t')]),
+            create(),
+          ],
+        ),
+        throwsA(
+          isA<A2uiValidationError>().having(
+            (e) => e.message,
+            'message',
+            contains('Surface not found'),
+          ),
+        ),
+      );
+    });
+
     test('accepts a surface recreated after a delete', () {
       expect(
         () => validatePayload(
