@@ -19,6 +19,7 @@ import {ImageComponent} from './image.component';
 import {A2uiRendererService} from '@a2ui/angular';
 import {ComponentBinder} from '@a2ui/angular';
 import {setComponentProps, createBoundProperty, ComponentToProps} from '@a2ui/angular/testing';
+import {basicCatalog} from '@a2ui/web_core/v0_9/basic_catalog';
 
 describe('ImageComponent', () => {
   let component: ImageComponent;
@@ -73,6 +74,25 @@ describe('ImageComponent', () => {
     expect(img.src).toBeTruthy();
     expect(img.style.objectFit).toBe('cover');
     expect(img.className).toContain('avatar');
+  });
+
+  it('should use the catalog default when fit is omitted', () => {
+    const catalog = basicCatalog.toJson() as {
+      components: {Image: {allOf: Array<{properties?: {fit?: {default: string}}}>}};
+    };
+    const expectedFit = catalog.components.Image.allOf.find(schema => schema.properties?.fit)
+      ?.properties?.fit?.default;
+    expect(typeof expectedFit).toBe('string');
+
+    setComponentProps(fixture, {
+      url: defaultProps.url,
+      variant: defaultProps.variant,
+    });
+    fixture.detectChanges();
+    const img = fixture.nativeElement.querySelector('img') as HTMLImageElement;
+    expect(img.style.objectFit).toBe(
+      expectedFit === 'scaleDown' ? 'scale-down' : (expectedFit as string),
+    );
   });
 
   it('should render image with description', () => {

@@ -1,5 +1,7 @@
 ## Unreleased
 
+- (v0_9) Fix the native `Image` component to default `fit` to `fill` instead of `cover` when omitted, matching the basic catalog. [#1298](https://github.com/a2ui-project/a2ui/issues/1298)
+
 ## 0.13.0
 
 - Bump dependencies for compatibility with `@a2ui/web_core: ^0.14.0`.

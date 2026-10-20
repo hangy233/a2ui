@@ -104,37 +104,66 @@ describe('Image Component', () => {
     assert.strictEqual(img?.classList.contains('a2ui-image-avatar'), true);
   });
 
-  it('should map fit="scaleDown" to valid CSS object-fit: scale-down', async () => {
-    processor.processMessages([
-      {
-        version: 'v0.9',
-        updateComponents: {
-          surfaceId: 'test-surface',
-          components: [
-            {
-              id: 'img_scaledown',
-              component: 'Image',
-              url: 'http://example.com/image.png',
-              fit: 'scaleDown',
-            },
-          ],
-        },
-      },
-    ]);
+  it('should use the catalog default when fit is omitted', async () => {
+    const catalog = basicCatalog.toJson() as {
+      components: {Image: {allOf: {properties?: {fit?: {default: string}}}[]}};
+    };
+    const defaultFit = catalog.components.Image.allOf.find(entry => entry.properties?.fit)
+      ?.properties?.fit?.default;
+    assert.strictEqual(typeof defaultFit, 'string');
 
     const el = document.createElement('a2ui-image') as A2uiWebComponentElement;
     element = el;
     document.body.appendChild(el);
 
-    const context = new ComponentContext(surface, 'img_scaledown');
     await asyncUpdate(el, e => {
-      e.context = context;
+      e.context = new ComponentContext(surface, 'comp1');
     });
 
     const img = el.querySelector('img') as HTMLImageElement;
     assert.notStrictEqual(img, null);
-    assert.strictEqual(img.style.objectFit, 'scale-down');
+    assert.strictEqual(img.style.objectFit, defaultFit === 'scaleDown' ? 'scale-down' : defaultFit);
   });
+
+  for (const [fit, objectFit] of [
+    ['contain', 'contain'],
+    ['cover', 'cover'],
+    ['fill', 'fill'],
+    ['none', 'none'],
+    ['scaleDown', 'scale-down'],
+  ] as const) {
+    it(`should render fit="${fit}" as CSS object-fit: ${objectFit}`, async () => {
+      processor.processMessages([
+        {
+          version: 'v0.9',
+          updateComponents: {
+            surfaceId: 'test-surface',
+            components: [
+              {
+                id: 'img_fit',
+                component: 'Image',
+                url: 'http://example.com/image.png',
+                fit,
+              },
+            ],
+          },
+        },
+      ]);
+
+      const el = document.createElement('a2ui-image') as A2uiWebComponentElement;
+      element = el;
+      document.body.appendChild(el);
+
+      const context = new ComponentContext(surface, 'img_fit');
+      await asyncUpdate(el, e => {
+        e.context = context;
+      });
+
+      const img = el.querySelector('img') as HTMLImageElement;
+      assert.notStrictEqual(img, null);
+      assert.strictEqual(img.style.objectFit, objectFit);
+    });
+  }
 
   describe('ImageApi schema validation', () => {
     it('should parse valid image with description', () => {

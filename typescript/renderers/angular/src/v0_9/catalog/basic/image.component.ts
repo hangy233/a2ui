@@ -77,7 +77,7 @@ export class ImageComponent extends BasicCatalogComponent<typeof ImageApi> {
   readonly url = computed(() => this.props()['url']?.value());
   readonly description = computed(() => this.props()['description']?.value() || '');
   readonly fit = computed(() => {
-    const val = this.props()['fit']?.value() || 'cover';
+    const val = this.props()['fit']?.value() || 'fill';
     return val === 'scaleDown' ? 'scale-down' : val;
   });
   readonly variant = computed(() => this.props()['variant']?.value() || 'default');

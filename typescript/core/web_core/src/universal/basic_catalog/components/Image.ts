@@ -75,7 +75,7 @@ export class A2uiImageElement extends BasicCatalogA2uiLitElement<ImageSupportedA
     if (!props) return nothing;
 
     const variant = props.variant || 'default';
-    const rawFit = props.fit || 'cover';
+    const rawFit = props.fit || 'fill';
     const fit = FIT_MAP[rawFit] ?? rawFit;
 
     return html`<img
