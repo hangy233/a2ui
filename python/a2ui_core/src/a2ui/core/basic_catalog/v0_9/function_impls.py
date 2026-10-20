@@ -136,6 +136,8 @@ def _numeric_execute(
         val = _to_float(args["value"])
     except (ValueError, TypeError):
         return False
+    if math.isnan(val):
+        return False
     min_val = args.get("min")
     if min_val is not None:
         try:

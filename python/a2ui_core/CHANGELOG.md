@@ -1,5 +1,8 @@
 ## Unreleased
 
+- Reject NaN values and strings such as `"NaN"` in the v0.9 and v1.0
+  `numeric` validator, with or without range bounds.
+
 ## 0.4.0 (2026-10-17)
 
 - Catalogs can reference components, property schemas and functions in peer
